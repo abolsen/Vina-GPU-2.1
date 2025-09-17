@@ -11,55 +11,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config \
-            libboost-all-dev ocl-icd-opencl-dev \
-            nvidia-cuda-toolkit
+            build-essential cmake pkg-config \
+            libboost-all-dev ocl-icd-opencl-dev
 
       - name: Build AutoDock-Vina-GPU-2.1
-        working-directory: AutoDock-Vina-GPU-2.1
         shell: bash
         run: |
           ulimit -s 8192
-          # Prefer OpenCL 3.0 on Linux
-          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
-          # Point Makefile to Ubuntu library dirs (adjust if your Makefile uses different var names)
-          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          make clean && make source
-          make
-          ls -l
+          cmake -S AutoDock-Vina-GPU-2.1 -B build-av -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-av --config Release -j
 
       - name: Build QuickVina-W-GPU-2.1
-        working-directory: QuickVina-W-GPU-2.1
         shell: bash
         run: |
           ulimit -s 8192
-          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
-          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          make clean && make source
-          make
-          ls -l
+          cmake -S QuickVina-W-GPU-2.1 -B build-qvw -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-qvw --config Release -j
 
       - name: Build QuickVina2-GPU-2.1
-        working-directory: QuickVina2-GPU-2.1
         shell: bash
         run: |
           ulimit -s 8192
-          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
-          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
-          make clean && make source
-          make
-          ls -l
+          cmake -S QuickVina2-GPU-2.1 -B build-qv2 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-qv2 --config Release -j
 
       - name: Collect & hash
         shell: bash
         run: |
           mkdir -p dist/linux
-          cp AutoDock-Vina-GPU-2.1/AutoDock-Vina-GPU-2.1 dist/linux/
-          cp QuickVina-W-GPU-2.1/QuickVina-W-GPU-2.1 dist/linux/
-          cp QuickVina2-GPU-2.1/QuickVina2-GPU-2.1 dist/linux/
+          cp build-av/AutoDock-Vina-GPU-2.1 dist/linux/ || cp build-av/Release/AutoDock-Vina-GPU-2.1 dist/linux/
+          cp build-qvw/QuickVina-W-GPU-2.1 dist/linux/ || cp build-qvw/Release/QuickVina-W-GPU-2.1 dist/linux/
+          cp build-qv2/QuickVina2-GPU-2.1 dist/linux/ || cp build-qv2/Release/QuickVina2-GPU-2.1 dist/linux/
           (cd dist/linux && sha256sum * > SHA256SUMS.txt)
 
       - name: Upload artifacts
