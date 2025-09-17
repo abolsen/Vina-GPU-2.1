@@ -8,41 +8,43 @@ jobs:
       VCPKG_DEFAULT_TRIPLET: x64-windows
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # <— ensures vcpkg submodule is fetched
 
       - name: MSVC dev shell
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Use v10, which supports 'vcpkgArguments' (classic mode: no baseline needed)
-      - name: Setup vcpkg (classic mode)
+      # Use the vendored vcpkg/ submodule, no baseline needed
+      - name: Setup vcpkg (classic)
         uses: lukka/run-vcpkg@v10
         with:
+          vcpkgDirectory: vcpkg
           runVcpkgInstall: true
-          vcpkgArguments: >
-            install
-            boost-program-options:x64-windows
-            boost-filesystem:x64-windows
-            boost-system:x64-windows
-            opencl:x64-windows
+          runVcpkgFormatString: >
+            install --clean-after-build --triplet x64-windows
+            boost-program-options
+            boost-filesystem
+            boost-system
+            opencl
 
-      # Build the three variants with our CMakeLists.txt files
       - name: Configure & build AutoDock-Vina-GPU-2.1
         run: |
           cmake -S AutoDock-Vina-GPU-2.1 -B build-av ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-av --config Release -j
 
       - name: Configure & build QuickVina-W-GPU-2.1
         run: |
           cmake -S QuickVina-W-GPU-2.1 -B build-qvw ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qvw --config Release -j
 
       - name: Configure & build QuickVina2-GPU-2.1
         run: |
           cmake -S QuickVina2-GPU-2.1 -B build-qv2 ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
 

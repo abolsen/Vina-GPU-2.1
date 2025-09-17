@@ -15,8 +15,9 @@ file(GLOB_RECURSE SRC
   "src/*/*.cpp"
   "lib/*.cpp"
   "lib/*/*.cpp"
+  "OpenCL/src/*.cpp"
 )
 
-add_executable(AutoDock-Vina-GPU-2.1 ${{SRC}})
-target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE ${{Boost_INCLUDE_DIRS}})
-target_link_libraries(AutoDock-Vina-GPU-2.1 PRIVATE ${{Boost_LIBRARIES}} OpenCL::OpenCL)
+add_executable(AutoDock-Vina-GPU-2.1 ${SRC})
+target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(AutoDock-Vina-GPU-2.1 PRIVATE ${Boost_LIBRARIES} OpenCL::OpenCL)

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(QuickVina2GPU21 CXX)
+project(QuickVinaWGPU21 CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 add_definitions(-DOPENCL_3_0 -DNVIDIA_PLATFORM)
@@ -15,8 +15,9 @@ file(GLOB_RECURSE SRC
   "src/*/*.cpp"
   "lib/*.cpp"
   "lib/*/*.cpp"
+  "OpenCL/src/*.cpp"
 )
 
-add_executable(QuickVina2-GPU-2.1 ${{SRC}})
-target_include_directories(QuickVina2-GPU-2.1 PRIVATE ${{Boost_INCLUDE_DIRS}})
-target_link_libraries(QuickVina2-GPU-2.1 PRIVATE ${{Boost_LIBRARIES}} OpenCL::OpenCL)
+add_executable(QuickVina-W-GPU-2.1 ${SRC})
+target_include_directories(QuickVina-W-GPU-2.1 PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(QuickVina-W-GPU-2.1 PRIVATE ${Boost_LIBRARIES} OpenCL::OpenCL)
