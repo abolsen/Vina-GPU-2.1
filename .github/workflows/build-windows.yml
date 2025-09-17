@@ -20,11 +20,7 @@ jobs:
           vcpkgDirectory: vcpkg
           runVcpkgInstall: true
           # Keep the format string minimal; no extra flags that the parser chokes on
-          runVcpkgFormatString: >
-            install boost-program-options:x64-windows
-                    boost-filesystem:x64-windows
-                    boost-system:x64-windows
-                    opencl:x64-windows
+          runVcpkgFormatString: 'install boost-program-options:x64-windows boost-filesystem:x64-windows boost-system:x64-windows opencl:x64-windows'
 
       - name: Configure & build AutoDock-Vina-GPU-2.1
         run: |
