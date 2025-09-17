@@ -1,3 +1,29 @@
+> **Unofficial builds**  
+> This is a fork that provides prebuilt binaries (Linux/Windows) for Vina-GPU 2.1.
+> Upstream source: https://github.com/DeltaGroupNJUPT/Vina-GPU-2.1  
+> License: Apache-2.0 (see LICENSE). See NOTICE for attributions and changes.  
+> **Not affiliated** with the upstream authors/maintainers.
+
+## What’s in this fork
+- GitHub Actions builds for:
+  - **AutoDock-Vina-GPU 2.1**
+  - **QuickVina-W-GPU 2.1**
+  - **QuickVina2-GPU 2.1**
+- Release artifacts: zipped binaries + `SHA256SUMS`.
+- Minimal smoke-test inputs and example config.
+
+## Driver / runtime requirements
+- **NVIDIA**: Recent driver supporting **CUDA 12.x** and OpenCL (tested with CUDA 12.2 headers).  
+- **OpenCL**: Provided by NVIDIA driver or vendor platform.  
+- You do **not** need a GPU to compile (CI builds without GPUs).
+
+## Get binaries
+- See **Releases** on this fork for downloads. Verify with `sha256sum` and run `--help` to test.
+
+---
+
+
+
 # Vina-GPU 2.1
 Vina-GPU 2.1 further improves the virtual screening runtime and accuracy with the noval RILC-BFGS and GCS mthods based on Vina-GPU 2.0. 
 Vina-GPU 2.1 includes AutoDock-Vina-GPU 2.1, QuickVina 2-GPU 2.1 and QuickVina-W-GPU 2.1.
