@@ -1,0 +1,38 @@
+name: build-windows
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install vcpkg & Boost
+        uses: lukka/run-vcpkg@v11.6
+        with:
+          vcpkgArguments: boost-program-options
+          vcpkgGitCommitId: 6a9e44e3f2d3b0f5c7dadb8f2c6f1e8a3d9d9f2a
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install CUDA (headers/libs)
+        # NVIDIA's CUDA installer is heavy; for CI, rely on preinstalled OpenCL from Windows SDK and use vcpkg Boost.
+        run: echo "If you need CUDA headers, pin a CUDA toolkit action here."
+
+      - name: Build AutoDock-Vina-GPU-2.1 (MSBuild)
+        run: |
+          cmake -S . -B build-av --preset windows-msvc-av || echo "Use provided VS solution if present"
+          # If no CMake project: generate a minimal VS project or use nmake with cl. Alternatively, supply a .sln in your fork.
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/windows
+          # Copy built EXEs into dist/windows; adjust paths to your build output
+          # cp build-av/Release/AutoDock-Vina-GPU-2.1.exe dist/windows/ || true
+          # cp build-qvw/... dist/windows/
+          # cp build-qv2/... dist/windows/
+          (cd dist/windows && ls -la && (command -v sha256sum && sha256sum * || certutil -hashfile *.exe SHA256 > SHA256SUMS.txt || true))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vina-gpu-2.1-windows-x64
+          path: dist/windows/**

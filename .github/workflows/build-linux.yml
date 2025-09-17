@@ -1,0 +1,53 @@
+name: build-linux
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config \
+              libboost-all-dev ocl-icd-opencl-dev nvidia-cuda-toolkit
+          echo "ulimit -s 8192" >> $GITHUB_ENV
+
+      - name: Build AutoDock-Vina-GPU-2.1
+        working-directory: AutoDock-Vina-GPU-2.1
+        run: |
+          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          make clean && make source
+          make
+          ls -l
+
+      - name: Build QuickVina-W-GPU-2.1
+        working-directory: QuickVina-W-GPU-2.1
+        run: |
+          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          make clean && make source
+          make
+          ls -l
+
+      - name: Build QuickVina2-GPU-2.1
+        working-directory: QuickVina2-GPU-2.1
+        run: |
+          sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          make clean && make source
+          make
+          ls -l
+
+      - name: Collect & hash
+        run: |
+          mkdir -p dist/linux
+          cp AutoDock-Vina-GPU-2.1/AutoDock-Vina-GPU-2.1 dist/linux/
+          cp QuickVina-W-GPU-2.1/QuickVina-W-GPU-2.1 dist/linux/
+          cp QuickVina2-GPU-2.1/QuickVina2-GPU-2.1 dist/linux/
+          (cd dist/linux && sha256sum * > SHA256SUMS.txt)
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vina-gpu-2.1-linux-x86_64
+          path: dist/linux/**

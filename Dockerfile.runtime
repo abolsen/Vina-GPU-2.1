@@ -1,0 +1,11 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y ocl-icd-libopencl1 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# Place binaries here at build time (CI copies into dist/linux first; multi-stage builds can COPY from artifacts)
+# Example:
+# COPY dist/linux/AutoDock-Vina-GPU-2.1 /usr/local/bin/
+# COPY dist/linux/QuickVina-W-GPU-2.1 /usr/local/bin/
+# COPY dist/linux/QuickVina2-GPU-2.1 /usr/local/bin/
+ENV PATH="/usr/local/bin:${PATH}"
+ENTRYPOINT ["AutoDock-Vina-GPU-2.1"]
+CMD ["--help"]
