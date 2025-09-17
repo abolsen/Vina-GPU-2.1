@@ -8,38 +8,42 @@ jobs:
       VCPKG_DEFAULT_TRIPLET: x64-windows
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive   # fetch vcpkg/ submodule
 
       - name: MSVC dev shell
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Setup vcpkg (classic with submodule)
-        uses: lukka/run-vcpkg@v10
-        with:
-          vcpkgDirectory: vcpkg
-          runVcpkgInstall: true
-          # Keep the format string minimal; no extra flags that the parser chokes on
-          runVcpkgFormatString: 'install boost-program-options:x64-windows boost-filesystem:x64-windows boost-system:x64-windows opencl:x64-windows'
+      - name: Install vcpkg and deps
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE\vcpkg
+          & $env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat
+          & $env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe install `
+            boost-program-options:x64-windows `
+            boost-filesystem:x64-windows `
+            boost-system:x64-windows `
+            opencl:x64-windows
 
       - name: Configure & build AutoDock-Vina-GPU-2.1
+        shell: pwsh
         run: |
-          cmake -S AutoDock-Vina-GPU-2.1 -B build-av ^
-            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          cmake -S AutoDock-Vina-GPU-2.1 -B build-av `
+            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-av --config Release -j
 
       - name: Configure & build QuickVina-W-GPU-2.1
+        shell: pwsh
         run: |
-          cmake -S QuickVina-W-GPU-2.1 -B build-qvw ^
-            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          cmake -S QuickVina-W-GPU-2.1 -B build-qvw `
+            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qvw --config Release -j
 
       - name: Configure & build QuickVina2-GPU-2.1
+        shell: pwsh
         run: |
-          cmake -S QuickVina2-GPU-2.1 -B build-qv2 ^
-            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          cmake -S QuickVina2-GPU-2.1 -B build-qv2 `
+            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
 
@@ -53,9 +57,7 @@ jobs:
           cd dist/windows
           : > SHA256SUMS.txt
           for f in *.exe; do
-            if [ -f "$f" ]; then
-              powershell -Command "Get-FileHash -Algorithm SHA256 '$f' | ForEach-Object { '\\' + $_.Hash + '  ' + '$f' }" >> SHA256SUMS.txt
-            fi
+            [ -f "$f" ] && powershell -Command "Get-FileHash -Algorithm SHA256 '$f' | %% { '\\' + $_.Hash + '  ' + '$f' }" >> SHA256SUMS.txt
           done
 
       - name: Upload artifacts

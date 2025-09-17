@@ -24,8 +24,9 @@ target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
 )
 
 # Preprocessor defines mirroring upstream Makefile
-target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
+target_compile_definitions(<TARGET> PRIVATE
   OPENCL_3_0
+  CL_TARGET_OPENCL_VERSION=300
   NVIDIA_PLATFORM
   SMALL_BOX
   BUILD_KERNEL_FROM_SOURCE

@@ -14,6 +14,20 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
+      # Guard Windows.h includes (non-destructive patch in CI only)
+      - name: Guard Windows.h includes for Linux
+        shell: bash
+        run: |
+          set -e
+          for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
+            # wrap any pure 'Windows.h' include with #if guards
+            for f in $(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' '^[[:space:]]*#include <Windows.h>' "$d" || true); do
+              awk 'BEGIN{p=1}
+                   /^#include <Windows\.h>/{print "#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)"; print; print "#endif"; p=0; next}
+                   {print}' "$f" > "$f.patched" && mv "$f.patched" "$f"
+            done
+          done
+
       - name: Build AutoDock-Vina-GPU-2.1
         shell: bash
         run: |
