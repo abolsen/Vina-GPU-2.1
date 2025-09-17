@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install vcpkg & Boost
-        uses: lukka/run-vcpkg@v11.6
+        uses: lukka/run-vcpkg@v11
         with:
           vcpkgArguments: boost-program-options
           vcpkgGitCommitId: 6a9e44e3f2d3b0f5c7dadb8f2c6f1e8a3d9d9f2a

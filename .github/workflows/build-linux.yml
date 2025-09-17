@@ -10,35 +10,51 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config \
-              libboost-all-dev ocl-icd-opencl-dev nvidia-cuda-toolkit
-          echo "ulimit -s 8192" >> $GITHUB_ENV
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libboost-all-dev ocl-icd-opencl-dev \
+            nvidia-cuda-toolkit
 
       - name: Build AutoDock-Vina-GPU-2.1
         working-directory: AutoDock-Vina-GPU-2.1
+        shell: bash
         run: |
+          ulimit -s 8192
+          # Prefer OpenCL 3.0 on Linux
           sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          # Point Makefile to Ubuntu library dirs (adjust if your Makefile uses different var names)
+          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
+          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
           make clean && make source
           make
           ls -l
 
       - name: Build QuickVina-W-GPU-2.1
         working-directory: QuickVina-W-GPU-2.1
+        shell: bash
         run: |
+          ulimit -s 8192
           sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
+          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
           make clean && make source
           make
           ls -l
 
       - name: Build QuickVina2-GPU-2.1
         working-directory: QuickVina2-GPU-2.1
+        shell: bash
         run: |
+          ulimit -s 8192
           sed -i 's/-DOPENCL_1_2/-DOPENCL_3_0/' Makefile || true
+          sed -i 's|^BOOST_LIB_PATH *=.*|BOOST_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
+          sed -i 's|^OPENCL_LIB_PATH *=.*|OPENCL_LIB_PATH = /usr/lib/x86_64-linux-gnu|' Makefile || true
           make clean && make source
           make
           ls -l
 
       - name: Collect & hash
+        shell: bash
         run: |
           mkdir -p dist/linux
           cp AutoDock-Vina-GPU-2.1/AutoDock-Vina-GPU-2.1 dist/linux/
