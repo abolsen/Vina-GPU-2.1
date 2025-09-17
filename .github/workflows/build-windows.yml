@@ -9,23 +9,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive   # <— ensures vcpkg submodule is fetched
+          submodules: recursive   # fetch vcpkg/ submodule
 
       - name: MSVC dev shell
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Use the vendored vcpkg/ submodule, no baseline needed
-      - name: Setup vcpkg (classic)
+      - name: Setup vcpkg (classic with submodule)
         uses: lukka/run-vcpkg@v10
         with:
           vcpkgDirectory: vcpkg
           runVcpkgInstall: true
+          # Keep the format string minimal; no extra flags that the parser chokes on
           runVcpkgFormatString: >
-            install --clean-after-build --triplet x64-windows
-            boost-program-options
-            boost-filesystem
-            boost-system
-            opencl
+            install boost-program-options:x64-windows
+                    boost-filesystem:x64-windows
+                    boost-system:x64-windows
+                    opencl:x64-windows
 
       - name: Configure & build AutoDock-Vina-GPU-2.1
         run: |

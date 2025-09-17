@@ -19,5 +19,10 @@ file(GLOB_RECURSE SRC
 )
 
 add_executable(AutoDock-Vina-GPU-2.1 ${SRC})
-target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
+  ${Boost_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib
+  ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/inc
+  ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
+)
 target_link_libraries(AutoDock-Vina-GPU-2.1 PRIVATE ${Boost_LIBRARIES} OpenCL::OpenCL)
