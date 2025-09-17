@@ -1,0 +1,26 @@
+Vina-GPU 2.1 – Unofficial Builds by abolsen
+https://github.com/abolsen/Vina-GPU-2.1
+
+This distribution contains binaries built from (and in some cases lightly modified from)
+the upstream project:
+
+  Vina-GPU 2.1
+  Copyright (c) 2022–2025 DeltaGroupNJUPT
+  Upstream repository: https://github.com/DeltaGroupNJUPT/Vina-GPU-2.1
+  License: Apache License, Version 2.0
+
+Notable upstream references (as requested by the upstream README):
+  - Tang, S. et al., “Vina-GPU 2.1 …” (2024)
+  - Ding, J. et al., “Vina-GPU 2.0 …” (2023)
+  - Tang, S. et al., “Accelerating AutoDock Vina with GPUs” (2022)
+  - Trott & Olson, “AutoDock Vina …” (2010)
+  - Hassan, N.M. et al., “QuickVina-W …” (2017)
+  - Alhossary, A. et al., “QuickVina 2 …” (2015)
+
+Downstream changes in this fork (abolsen):
+  - Added CI workflows to build Linux and Windows binaries.
+  - Added release packaging (hashes, example configs).
+  - Documentation clarifications; no algorithmic changes unless stated in release notes.
+
+This software is distributed under the Apache License, Version 2.0.
+You must retain this NOTICE file and the LICENSE when redistributing.
