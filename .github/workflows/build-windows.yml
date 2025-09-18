@@ -15,34 +15,35 @@ jobs:
       - name: Install vcpkg and deps
         shell: pwsh
         run: |
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE\vcpkg
-          & $env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat
-          # manifest mode: NO package names here
-          & $env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe install
-
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
+          & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
+          # You have vcpkg.json in repo root → manifest mode: NO package arguments
+          & "${{ github.workspace }}\vcpkg\vcpkg.exe" install
+      
       - name: Configure & build AutoDock-Vina-GPU-2.1
         shell: pwsh
         run: |
           cmake -S AutoDock-Vina-GPU-2.1 -B build-av `
-            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-av --config Release -j
-
+      
       - name: Configure & build QuickVina-W-GPU-2.1
         shell: pwsh
         run: |
           cmake -S QuickVina-W-GPU-2.1 -B build-qvw `
-            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qvw --config Release -j
-
+      
       - name: Configure & build QuickVina2-GPU-2.1
         shell: pwsh
         run: |
           cmake -S QuickVina2-GPU-2.1 -B build-qv2 `
-            -DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
+      
 
       - name: Collect & hash
         shell: bash

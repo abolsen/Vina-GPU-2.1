@@ -15,18 +15,32 @@ jobs:
             libboost-all-dev ocl-icd-opencl-dev
 
       # Guard Windows.h includes (non-destructive patch in CI only)
-      - name: Guard Windows.h includes for Linux
+      - name: Guard Windows.h includes (Linux only)
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+          shopt -s nullglob
           for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
-            # wrap any pure 'Windows.h' include with #if guards
-            for f in $(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' '^[[:space:]]*#include <Windows.h>' "$d" || true); do
-              awk 'BEGIN{p=1}
-                   /^#include <Windows\.h>/{print "#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)"; print; print "#endif"; p=0; next}
-                   {print}' "$f" > "$f.patched" && mv "$f.patched" "$f"
+            # handle both Windows.h and windows.h, in .h/.hpp/.cpp
+            for f in $(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' -E '#include\s*<([Ww]indows\.h)>' "$d" || true); do
+              awk '
+                BEGIN { patched=0 }
+                {
+                  if ($0 ~ /^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>/ && patched==0) {
+                    print "#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)"
+                    print $0
+                    print "#else"
+                    print "#include <cstring>  // shim for Linux CI"
+                    print "#endif"
+                    patched=1
+                  } else {
+                    print
+                  }
+                }
+              ' "$f" > "$f.patched" && mv "$f.patched" "$f"
             done
           done
+    
 
       - name: Build AutoDock-Vina-GPU-2.1
         shell: bash
