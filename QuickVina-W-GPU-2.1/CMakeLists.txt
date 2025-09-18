@@ -21,6 +21,14 @@ else()
   set(BOOST_LIBS ${Boost_LIBRARIES})
 endif()
 
+# --- Linux/macOS compatibility for Windows-only PID call ---
+if (NOT MSVC)
+  # Ensure getpid() is available and transparently substitute the Windows call.
+  target_compile_options(${PROJECT_NAME} PRIVATE -include unistd.h)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE GetCurrentProcessId=getpid)
+endif()
+
+
 file(GLOB_RECURSE SRC
   "main/*.cpp"
   "src/*.cpp"
