@@ -21,14 +21,6 @@ else()
   set(BOOST_LIBS ${Boost_LIBRARIES})
 endif()
 
-# --- Linux/macOS compatibility for Windows-only PID call ---
-if (NOT MSVC)
-  # Ensure getpid() is available and transparently substitute the Windows call.
-  target_compile_options(${PROJECT_NAME} PRIVATE -include unistd.h)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE GetCurrentProcessId=getpid)
-endif()
-
-
 file(GLOB_RECURSE SRC
   "main/*.cpp"
   "src/*.cpp"
@@ -38,10 +30,10 @@ file(GLOB_RECURSE SRC
   "OpenCL/src/*.cpp"
 )
 
-add_executable(AutoDock-Vina-GPU-2.1 ${SRC})
+set(TGT AutoDock-Vina-GPU-2.1)
+add_executable(${TGT} ${SRC})
 
-# NOTE: put compat/include FIRST so our shim resolves before Boost headers
-target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
+target_include_directories(${TGT} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/compat/include
   ${BOOST_INCLUDES}
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
@@ -49,7 +41,7 @@ target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
 )
 
-target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
+target_compile_definitions(${TGT} PRIVATE
   OPENCL_3_0
   CL_TARGET_OPENCL_VERSION=300
   NVIDIA_PLATFORM
@@ -57,9 +49,13 @@ target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
   BUILD_KERNEL_FROM_SOURCE
   BOOST_TIMER_ENABLE_DEPRECATED
   $<$<BOOL:WIN32>:WINDOWS>
+  $<$<CXX_COMPILER_ID:MSVC>:_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING>
 )
 
-target_link_libraries(AutoDock-Vina-GPU-2.1 PRIVATE
-  OpenCL::OpenCL
-  ${BOOST_LIBS}
-)
+# Linux/macOS: make GetCurrentProcessId() work without source edits
+if (NOT MSVC)
+  target_compile_options(${TGT} PRIVATE -include unistd.h)
+  target_compile_definitions(${TGT} PRIVATE GetCurrentProcessId=getpid)
+endif()
+
+target_link_libraries(${TGT} PRIVATE OpenCL::OpenCL ${BOOST_LIBS})

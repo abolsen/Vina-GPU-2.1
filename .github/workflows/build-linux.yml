@@ -15,6 +15,35 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
+      # Safety net: make Windows-only bits compile on Linux without touching sources
+      - name: Linux compatibility patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Stub <Windows.h> so unconditional includes don't fail
+          for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
+            mkdir -p "$d/OpenCL/inc"
+            cat > "$d/OpenCL/inc/Windows.h" <<'EOF'
+            #ifndef VINA_GPU_LINUX_WINDOWS_H_STUB
+            #define VINA_GPU_LINUX_WINDOWS_H_STUB
+            /* CI stub for Linux builds */
+            #endif
+            EOF
+          done
+          # Map GetCurrentProcessId() -> getpid() in my_pid.cpp (AV uses it)
+          F="AutoDock-Vina-GPU-2.1/lib/my_pid.cpp"
+          if [ -f "$F" ] && ! grep -q 'GetCurrentProcessId getpid' "$F"; then
+            tmp="$(mktemp)"
+            {
+              echo '#if !defined(_WIN32) && !defined(WIN32) && !defined(WINDOWS)'
+              echo '#include <unistd.h>'
+              echo '#define GetCurrentProcessId getpid'
+              echo '#endif'
+              cat "$F"
+            } > "$tmp"
+            mv "$tmp" "$F"
+          fi
+
       - name: Build AutoDock-Vina-GPU-2.1
         shell: bash
         run: |
