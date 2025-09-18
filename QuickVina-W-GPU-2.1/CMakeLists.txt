@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(QuickVinaWGPU21 CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS program_options filesystem system serialization random timer math)
+find_package(Boost CONFIG REQUIRED COMPONENTS headers program_options filesystem system serialization random timer math)
 find_package(OpenCL REQUIRED)
 
 file(GLOB_RECURSE SRC
@@ -34,6 +34,7 @@ target_compile_definitions(QuickVina-W-GPU-2.1 PRIVATE
 
 target_link_libraries(QuickVina-W-GPU-2.1 PRIVATE
   OpenCL::OpenCL
+  Boost::headers
   Boost::program_options
   Boost::filesystem
   Boost::system

@@ -14,19 +14,17 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
-      # Provide a harmless Windows.h shim in each method, so unconditional includes don't fail on Linux.
       - name: Add Windows.h shim (Linux only)
         shell: bash
         run: |
           set -euo pipefail
           for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
             mkdir -p "$d/OpenCL/inc"
-            cat > "$d/OpenCL/inc/Windows.h" <<'EOF'
-#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB
-#define VINA_GPU_LINUX_WINDOWS_H_STUB
-/* Linux CI stub: satisfy unconditional #include <Windows.h>. */
-#endif
-EOF
+            printf '%s\n' \
+            '#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB' \
+            '#define VINA_GPU_LINUX_WINDOWS_H_STUB' \
+            '/* Linux CI stub: satisfy unconditional #include <Windows.h>. */' \
+            '#endif' > "$d/OpenCL/inc/Windows.h"
           done
 
       - name: Build AutoDock-Vina-GPU-2.1

@@ -17,8 +17,9 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
           & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          # Force classic mode even if a vcpkg.json is present somewhere
+          # Force classic mode even if a manifest is present
           & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
+            boost:x64-windows `
             boost-program-options:x64-windows `
             boost-filesystem:x64-windows `
             boost-system:x64-windows `
