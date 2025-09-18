@@ -15,25 +15,27 @@ jobs:
       - name: Add Boost convenience.hpp compat header
         shell: pwsh
         run: |
-          $compat = Join-Path "${{ github.workspace }}" "compat/include/boost/filesystem"
+          $compat = Join-Path "${{ github.workspace }}" "AutoDock-Vina-GPU-2.1\compat\include\boost\filesystem"
           New-Item -ItemType Directory -Force -Path $compat | Out-Null
-          $content = @"
+          @"
           #ifndef BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
           #define BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
-          // Compatibility shim for legacy include. Pull in operations + path.
-          // Upstream code typically only needs these.
           #include <boost/filesystem/operations.hpp>
           #include <boost/filesystem/path.hpp>
           #endif
-          "@
-          Set-Content -Encoding ASCII -Path (Join-Path $compat "convenience.hpp") -Value $content
+          "@ | Set-Content -Encoding ASCII (Join-Path $compat "convenience.hpp")
+          # Also mirror into the other two method dirs to be safe
+          foreach ($d in @("QuickVina-W-GPU-2.1","QuickVina2-GPU-2.1")) {
+            $p = Join-Path "${{ github.workspace }}" "$d\compat\include\boost\filesystem"
+            New-Item -ItemType Directory -Force -Path $p | Out-Null
+            Copy-Item (Join-Path $compat "convenience.hpp") -Destination (Join-Path $p "convenience.hpp") -Force
+          }
 
       - name: Install vcpkg (classic) and required ports
         shell: pwsh
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
           & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          # Force classic mode even if a manifest is present
           & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
             boost:x64-windows `
             boost-program-options:x64-windows `
@@ -72,6 +74,7 @@ jobs:
       - name: Collect & hash
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist/windows
           cp build-av/Release/AutoDock-Vina-GPU-2.1.exe dist/windows/ || true
           cp build-qvw/Release/QuickVina-W-GPU-2.1.exe dist/windows/ || true
