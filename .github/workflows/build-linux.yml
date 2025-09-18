@@ -63,35 +63,41 @@ jobs:
         run: |
           set -euo pipefail
           ulimit -s 8192
+      
           cmake -S QuickVina2-GPU-2.1 -B build-qv2 -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
+      
+          # (optional) quick sanity info that won't break the build if missing
+          file build-qv2/QuickVina2-GPU-2.1 || true
+          ldd  build-qv2/QuickVina2-GPU-2.1 || true
+        
 
-          - name: Collect & hash
-          shell: bash
-          run: |
-            set -euo pipefail
-            outdir="dist/linux"
-            mkdir -p "$outdir"
-        
-            # list of [build-dir, binary-name]
-            bins=(
-              "build-av/AutoDock-Vina-GPU-2.1"
-              "build-qvw/QuickVina-W-GPU-2.1"
-              "build-qv2/QuickVina2-GPU-2.1"
-            )
-        
-            for b in "${bins[@]}"; do
-              name=$(basename "$b")
-              if [[ -f "$b" ]]; then
-                cp "$b" "$outdir/"
-              elif [[ -f "$(dirname "$b")/Release/$name" ]]; then
-                cp "$(dirname "$b")/Release/$name" "$outdir/"
-              else
-                echo "❌ Missing binary: $b (and no Release fallback)" >&2
-                exit 1
-              fi
-            done
-        
-            # write checksums
-            (cd "$outdir" && sha256sum * > SHA256SUMS.txt)
+      - name: Collect & hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          outdir="dist/linux"
+          mkdir -p "$outdir"
+      
+          # list of [build-dir, binary-name]
+          bins=(
+            "build-av/AutoDock-Vina-GPU-2.1"
+            "build-qvw/QuickVina-W-GPU-2.1"
+            "build-qv2/QuickVina2-GPU-2.1"
+          )
+      
+          for b in "${bins[@]}"; do
+            name=$(basename "$b")
+            if [[ -f "$b" ]]; then
+              cp "$b" "$outdir/"
+            elif [[ -f "$(dirname "$b")/Release/$name" ]]; then
+              cp "$(dirname "$b")/Release/$name" "$outdir/"
+            else
+              echo "❌ Missing binary: $b (and no Release fallback)" >&2
+              exit 1
+            fi
+          done
+      
+          # write checksums
+          (cd "$outdir" && sha256sum * > SHA256SUMS.txt)
         
