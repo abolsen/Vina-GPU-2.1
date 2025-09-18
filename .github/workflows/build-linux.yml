@@ -16,32 +16,30 @@ jobs:
             libboost-all-dev ocl-icd-opencl-dev
 
       # Safety net: make Windows-only bits compile on Linux without touching sources
-      - name: Linux compatibility patch
+      - name: Linux compatibility patch (no heredocs)
         shell: bash
         run: |
           set -euo pipefail
           # Stub <Windows.h> so unconditional includes don't fail
           for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
             mkdir -p "$d/OpenCL/inc"
-            cat > "$d/OpenCL/inc/Windows.h" <<'EOF'
-            #ifndef VINA_GPU_LINUX_WINDOWS_H_STUB
-            #define VINA_GPU_LINUX_WINDOWS_H_STUB
-            /* CI stub for Linux builds */
-            #endif
-            EOF
+            printf '%s\n' \
+            '#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB' \
+            '#define VINA_GPU_LINUX_WINDOWS_H_STUB' \
+            '/* CI stub for Linux builds */' \
+            '#endif' > "$d/OpenCL/inc/Windows.h"
           done
           # Map GetCurrentProcessId() -> getpid() in my_pid.cpp (AV uses it)
           F="AutoDock-Vina-GPU-2.1/lib/my_pid.cpp"
           if [ -f "$F" ] && ! grep -q 'GetCurrentProcessId getpid' "$F"; then
-            tmp="$(mktemp)"
-            {
-              echo '#if !defined(_WIN32) && !defined(WIN32) && !defined(WINDOWS)'
-              echo '#include <unistd.h>'
-              echo '#define GetCurrentProcessId getpid'
-              echo '#endif'
-              cat "$F"
-            } > "$tmp"
-            mv "$tmp" "$F"
+            T="$(mktemp)"
+            printf '%s\n' \
+            '#if !defined(_WIN32) && !defined(WIN32) && !defined(WINDOWS)' \
+            '#include <unistd.h>' \
+            '#define GetCurrentProcessId getpid' \
+            '#endif' > "$T"
+            cat "$F" >> "$T"
+            mv "$T" "$F"
           fi
 
       - name: Build AutoDock-Vina-GPU-2.1
@@ -75,11 +73,4 @@ jobs:
           mkdir -p dist/linux
           cp build-av/AutoDock-Vina-GPU-2.1 dist/linux/ || cp build-av/Release/AutoDock-Vina-GPU-2.1 dist/linux/
           cp build-qvw/QuickVina-W-GPU-2.1 dist/linux/ || cp build-qvw/Release/QuickVina-W-GPU-2.1 dist/linux/
-          cp build-qv2/QuickVina2-GPU-2.1 dist/linux/ || cp build-qv2/Release/QuickVina2-GPU-2.1 dist/linux/
-          (cd dist/linux && sha256sum * > SHA256SUMS.txt)
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: vina-gpu-2.1-linux-x86_64
-          path: dist/linux/**
+          cp buil
