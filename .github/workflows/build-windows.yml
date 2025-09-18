@@ -12,6 +12,22 @@ jobs:
       - name: MSVC dev shell
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Add Boost convenience.hpp compat header
+        shell: pwsh
+        run: |
+          $compat = Join-Path "${{ github.workspace }}" "compat/include/boost/filesystem"
+          New-Item -ItemType Directory -Force -Path $compat | Out-Null
+          $content = @"
+          #ifndef BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
+          #define BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
+          // Compatibility shim for legacy include. Pull in operations + path.
+          // Upstream code typically only needs these.
+          #include <boost/filesystem/operations.hpp>
+          #include <boost/filesystem/path.hpp>
+          #endif
+          "@
+          Set-Content -Encoding ASCII -Path (Join-Path $compat "convenience.hpp") -Value $content
+
       - name: Install vcpkg (classic) and required ports
         shell: pwsh
         run: |

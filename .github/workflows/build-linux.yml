@@ -14,18 +14,32 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
-      - name: Add Windows.h shim (Linux only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
-            mkdir -p "$d/OpenCL/inc"
-            printf '%s\n' \
-            '#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB' \
-            '#define VINA_GPU_LINUX_WINDOWS_H_STUB' \
-            '/* Linux CI stub: satisfy unconditional #include <Windows.h>. */' \
-            '#endif' > "$d/OpenCL/inc/Windows.h"
-          done
+            - name: Patch Windows-specific bits for Linux
+            shell: bash
+            run: |
+              set -euo pipefail
+              # 1) Provide a stub Windows.h so unconditional includes don't break
+              for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
+                mkdir -p "$d/OpenCL/inc"
+                printf '%s\n' \
+                '#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB' \
+                '#define VINA_GPU_LINUX_WINDOWS_H_STUB' \
+                '/* Linux CI stub: satisfy unconditional #include <Windows.h>. */' \
+                '#endif' > "$d/OpenCL/inc/Windows.h"
+              done
+              # 2) my_pid.cpp uses GetCurrentProcessId(). Map it to getpid() on Linux.
+              #    Also make sure <unistd.h> is included on Linux.
+              f="AutoDock-Vina-GPU-2.1/lib/my_pid.cpp"
+              if [ -f "$f" ]; then
+                # if not already guarded, inject a guard block at the top
+                awk 'NR==1{
+                  print "#if !defined(_WIN32) && !defined(WIN32) && !defined(WINDOWS)"
+                  print "#include <unistd.h>"
+                  print "#define GetCurrentProcessId getpid"
+                  print "#endif"
+                }1' "$f" > "$f.patched" && mv "$f.patched" "$f"
+              fi
+    
 
       - name: Build AutoDock-Vina-GPU-2.1
         shell: bash

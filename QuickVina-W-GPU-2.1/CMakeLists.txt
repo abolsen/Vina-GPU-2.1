@@ -33,6 +33,7 @@ file(GLOB_RECURSE SRC
 add_executable(QuickVina-W-GPU-2.1 ${SRC})
 
 target_include_directories(QuickVina-W-GPU-2.1 PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/compat/include
   ${BOOST_INCLUDES}
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/inc
