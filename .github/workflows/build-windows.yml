@@ -71,19 +71,35 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
 
-      - name: Collect & hash
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist/windows
-          cp build-av/Release/AutoDock-Vina-GPU-2.1.exe dist/windows/ || true
-          cp build-qvw/Release/QuickVina-W-GPU-2.1.exe dist/windows/ || true
-          cp build-qv2/Release/QuickVina2-GPU-2.1.exe dist/windows/ || true
-          cd dist/windows
-          : > SHA256SUMS.txt
-          for f in *.exe; do
-            [ -f "$f" ] && powershell -Command "Get-FileHash -Algorithm SHA256 '$f' | %% { '\\' + $_.Hash + '  ' + '$f' }" >> SHA256SUMS.txt
-          done
+          - name: Collect & hash
+          shell: pwsh
+          run: |
+            $ErrorActionPreference = 'Stop'
+            $dir = "dist\windows"
+            New-Item -Force -ItemType Directory -Path $dir | Out-Null
+        
+            # Copy the three exes (Release or non-Release fallback)
+            $bins = @(
+              "build-av\Release\AutoDock-Vina-GPU-2.1.exe",
+              "build-qvw\Release\QuickVina-W-GPU-2.1.exe",
+              "build-qv2\Release\QuickVina2-GPU-2.1.exe"
+            )
+            foreach ($b in $bins) {
+              if (Test-Path $b) { Copy-Item $b $dir -Force }
+              else {
+                $fallback = $b -replace "\\Release\\", "\"
+                if (Test-Path $fallback) { Copy-Item $fallback $dir -Force }
+                else { Write-Error "Missing artifact: $b (and fallback $fallback)" }
+              }
+            }
+        
+            # Write SHA256SUMS.txt in 'hash  filename' format
+            $files = Get-ChildItem $dir -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" }
+            $lines = foreach ($f in $files) {
+              $h = Get-FileHash -Path $f.FullName -Algorithm SHA256
+              "$($h.Hash)  $($f.Name)"
+            }
+            Set-Content -Path (Join-Path $dir "SHA256SUMS.txt") -Value $lines -Encoding ASCII        
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
