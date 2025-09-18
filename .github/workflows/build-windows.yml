@@ -12,14 +12,18 @@ jobs:
       - name: MSVC dev shell
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install vcpkg and deps
+      - name: Install vcpkg (classic) and required ports
         shell: pwsh
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
           & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          # You have vcpkg.json in repo root → manifest mode: NO package arguments
-          & "${{ github.workspace }}\vcpkg\vcpkg.exe" install
-      
+          # Force classic mode so we can pass explicit packages even if a vcpkg.json exists
+          & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
+            boost-program-options:x64-windows `
+            boost-filesystem:x64-windows `
+            boost-system:x64-windows `
+            opencl:x64-windows
+
       - name: Configure & build AutoDock-Vina-GPU-2.1
         shell: pwsh
         run: |
@@ -27,7 +31,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-av --config Release -j
-      
+
       - name: Configure & build QuickVina-W-GPU-2.1
         shell: pwsh
         run: |
@@ -35,7 +39,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qvw --config Release -j
-      
+
       - name: Configure & build QuickVina2-GPU-2.1
         shell: pwsh
         run: |
@@ -43,7 +47,6 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-qv2 --config Release -j
-      
 
       - name: Collect & hash
         shell: bash

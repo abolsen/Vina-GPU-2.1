@@ -14,33 +14,20 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
-      # Guard Windows.h includes (non-destructive patch in CI only)
+      # Wrap any unconditional #include <Windows.h> / <windows.h> so Linux can compile
       - name: Guard Windows.h includes (Linux only)
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
           for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
-            # handle both Windows.h and windows.h, in .h/.hpp/.cpp
-            for f in $(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' -E '#include\s*<([Ww]indows\.h)>' "$d" || true); do
-              awk '
-                BEGIN { patched=0 }
-                {
-                  if ($0 ~ /^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>/ && patched==0) {
-                    print "#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)"
-                    print $0
-                    print "#else"
-                    print "#include <cstring>  // shim for Linux CI"
-                    print "#endif"
-                    patched=1
-                  } else {
-                    print
-                  }
-                }
-              ' "$f" > "$f.patched" && mv "$f.patched" "$f"
+            # Replace any line that includes Windows.h (any case, any leading whitespace)
+            # with a guarded block. This is CI-only; your source tree stays unchanged.
+            files=$(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' -E '^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>' "$d" || true)
+            for f in $files; do
+              sed -E -i 's@^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>@#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)\n#include <Windows.h>\n#else\n/* no Windows.h on Linux */\n#endif@g' "$f"
             done
           done
-    
 
       - name: Build AutoDock-Vina-GPU-2.1
         shell: bash
