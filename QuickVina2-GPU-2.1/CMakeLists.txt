@@ -22,7 +22,7 @@ target_include_directories(QuickVina2-GPU-2.1 PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
 )
 
-target_compile_definitions(<TARGET> PRIVATE
+target_compile_definitions(QuickVina2-GPU-2.1 PRIVATE
   OPENCL_3_0
   CL_TARGET_OPENCL_VERSION=300
   NVIDIA_PLATFORM

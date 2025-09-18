@@ -15,7 +15,6 @@ file(GLOB_RECURSE SRC
 
 add_executable(AutoDock-Vina-GPU-2.1 ${SRC})
 
-# Include dirs (project + deps)
 target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
   ${Boost_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
@@ -23,8 +22,7 @@ target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
 )
 
-# Preprocessor defines mirroring upstream Makefile
-target_compile_definitions(<TARGET> PRIVATE
+target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
   OPENCL_3_0
   CL_TARGET_OPENCL_VERSION=300
   NVIDIA_PLATFORM

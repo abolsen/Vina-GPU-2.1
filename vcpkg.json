@@ -1,11 +1,10 @@
 {
-    "name": "vina-gpu-2-1-build",
-    "version": "0.1.0",
-    "dependencies": [
-      "boost-program-options",
-      "boost-filesystem",
-      "boost-system",
-      "opencl"
-    ]
-  }
-  
+  "name": "vina-gpu-2-1-build",
+  "version": "0.1.0",
+  "dependencies": [
+    "boost-program-options",
+    "boost-filesystem",
+    "boost-system",
+    "opencl"
+  ]
+}

@@ -17,11 +17,8 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE\vcpkg
           & $env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat
-          & $env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe install `
-            boost-program-options:x64-windows `
-            boost-filesystem:x64-windows `
-            boost-system:x64-windows `
-            opencl:x64-windows
+          # manifest mode: NO package names here
+          & $env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe install
 
       - name: Configure & build AutoDock-Vina-GPU-2.1
         shell: pwsh
