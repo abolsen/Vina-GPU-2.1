@@ -39,4 +39,8 @@ target_link_libraries(${TGT} PRIVATE
 
 if (NOT MSVC)
   target_link_libraries(${TGT} PRIVATE stdc++fs)
+  target_compile_options(${TGT} PRIVATE
+    "-include" "${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/inc/linux_fix.h")
+  target_sources(${TGT} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src/linux_fix.cpp")
 endif()
