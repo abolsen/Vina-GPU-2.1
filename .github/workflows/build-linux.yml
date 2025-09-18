@@ -14,19 +14,19 @@ jobs:
             build-essential cmake pkg-config \
             libboost-all-dev ocl-icd-opencl-dev
 
-      # Wrap any unconditional #include <Windows.h> / <windows.h> so Linux can compile
-      - name: Guard Windows.h includes (Linux only)
+      # Provide a harmless Windows.h shim in each method, so unconditional includes don't fail on Linux.
+      - name: Add Windows.h shim (Linux only)
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
           for d in AutoDock-Vina-GPU-2.1 QuickVina-W-GPU-2.1 QuickVina2-GPU-2.1; do
-            # Replace any line that includes Windows.h (any case, any leading whitespace)
-            # with a guarded block. This is CI-only; your source tree stays unchanged.
-            files=$(grep -RIl --include='*.h' --include='*.hpp' --include='*.cpp' -E '^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>' "$d" || true)
-            for f in $files; do
-              sed -E -i 's@^[[:space:]]*#include[[:space:]]*<([Ww]indows\.h)>@#if defined(_WIN32) || defined(WIN32) || defined(WINDOWS)\n#include <Windows.h>\n#else\n/* no Windows.h on Linux */\n#endif@g' "$f"
-            done
+            mkdir -p "$d/OpenCL/inc"
+            cat > "$d/OpenCL/inc/Windows.h" <<'EOF'
+#ifndef VINA_GPU_LINUX_WINDOWS_H_STUB
+#define VINA_GPU_LINUX_WINDOWS_H_STUB
+/* Linux CI stub: satisfy unconditional #include <Windows.h>. */
+#endif
+EOF
           done
 
       - name: Build AutoDock-Vina-GPU-2.1

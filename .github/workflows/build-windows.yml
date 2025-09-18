@@ -17,11 +17,15 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
           & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          # Force classic mode so we can pass explicit packages even if a vcpkg.json exists
+          # Force classic mode even if a vcpkg.json is present somewhere
           & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
             boost-program-options:x64-windows `
             boost-filesystem:x64-windows `
             boost-system:x64-windows `
+            boost-serialization:x64-windows `
+            boost-random:x64-windows `
+            boost-timer:x64-windows `
+            boost-math:x64-windows `
             opencl:x64-windows
 
       - name: Configure & build AutoDock-Vina-GPU-2.1
