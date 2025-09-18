@@ -2,10 +2,31 @@ cmake_minimum_required(VERSION 3.20)
 project(AutoDockVinaGPU21 CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS headers program_options filesystem system serialization random timer math)
+# ---- Dependencies ----
 find_package(OpenCL REQUIRED)
 
+if (MSVC)
+  # vcpkg provides Boost CONFIG targets on Windows
+  find_package(Boost CONFIG REQUIRED COMPONENTS
+    headers program_options filesystem system serialization random timer math
+  )
+  set(BOOST_INCLUDES ${Boost_INCLUDE_DIRS})
+  set(BOOST_LIBS
+    Boost::headers Boost::program_options Boost::filesystem Boost::system
+    Boost::serialization Boost::random Boost::timer Boost::math
+  )
+else()
+  # Linux: use classic FindBoost and DO NOT request 'math' (header-only here)
+  find_package(Boost REQUIRED COMPONENTS
+    program_options filesystem system serialization random timer
+  )
+  set(BOOST_INCLUDES ${Boost_INCLUDE_DIRS})
+  set(BOOST_LIBS ${Boost_LIBRARIES})
+endif()
+
+# ---- Sources ----
 file(GLOB_RECURSE SRC
+  "main/*.cpp"
   "src/*.cpp"
   "src/*/*.cpp"
   "lib/*.cpp"
@@ -15,13 +36,15 @@ file(GLOB_RECURSE SRC
 
 add_executable(AutoDock-Vina-GPU-2.1 ${SRC})
 
+# ---- Includes ----
 target_include_directories(AutoDock-Vina-GPU-2.1 PRIVATE
-  ${Boost_INCLUDE_DIRS}
+  ${BOOST_INCLUDES}
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/inc
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
 )
 
+# ---- Defines ----
 target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
   OPENCL_3_0
   CL_TARGET_OPENCL_VERSION=300
@@ -32,14 +55,8 @@ target_compile_definitions(AutoDock-Vina-GPU-2.1 PRIVATE
   $<$<BOOL:WIN32>:WINDOWS>
 )
 
+# ---- Link ----
 target_link_libraries(AutoDock-Vina-GPU-2.1 PRIVATE
   OpenCL::OpenCL
-  Boost::headers
-  Boost::program_options
-  Boost::filesystem
-  Boost::system
-  Boost::serialization
-  Boost::random
-  Boost::timer
-  Boost::math
+  ${BOOST_LIBS}
 )

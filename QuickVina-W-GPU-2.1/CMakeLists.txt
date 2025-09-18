@@ -2,10 +2,27 @@ cmake_minimum_required(VERSION 3.20)
 project(QuickVinaWGPU21 CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS headers program_options filesystem system serialization random timer math)
 find_package(OpenCL REQUIRED)
 
+if (MSVC)
+  find_package(Boost CONFIG REQUIRED COMPONENTS
+    headers program_options filesystem system serialization random timer math
+  )
+  set(BOOST_INCLUDES ${Boost_INCLUDE_DIRS})
+  set(BOOST_LIBS
+    Boost::headers Boost::program_options Boost::filesystem Boost::system
+    Boost::serialization Boost::random Boost::timer Boost::math
+  )
+else()
+  find_package(Boost REQUIRED COMPONENTS
+    program_options filesystem system serialization random timer
+  )
+  set(BOOST_INCLUDES ${Boost_INCLUDE_DIRS})
+  set(BOOST_LIBS ${Boost_LIBRARIES})
+endif()
+
 file(GLOB_RECURSE SRC
+  "main/*.cpp"
   "src/*.cpp"
   "src/*/*.cpp"
   "lib/*.cpp"
@@ -16,7 +33,7 @@ file(GLOB_RECURSE SRC
 add_executable(QuickVina-W-GPU-2.1 ${SRC})
 
 target_include_directories(QuickVina-W-GPU-2.1 PRIVATE
-  ${Boost_INCLUDE_DIRS}
+  ${BOOST_INCLUDES}
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/inc
   ${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src
@@ -34,12 +51,5 @@ target_compile_definitions(QuickVina-W-GPU-2.1 PRIVATE
 
 target_link_libraries(QuickVina-W-GPU-2.1 PRIVATE
   OpenCL::OpenCL
-  Boost::headers
-  Boost::program_options
-  Boost::filesystem
-  Boost::system
-  Boost::serialization
-  Boost::random
-  Boost::timer
-  Boost::math
+  ${BOOST_LIBS}
 )
