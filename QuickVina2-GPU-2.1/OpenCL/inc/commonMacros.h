@@ -1,29 +1,29 @@
 #ifndef COMMON_MACROS_H
 #define COMMON_MACROS_H
+#define _CRT_SECURE_NO_WARNINGS
+//#define CL_USE_DEPRECATED_OPENCL_3_0_APIS
 
-// Ensure OpenCL 3.0 headers default is explicit (silences warnings).
-#ifndef CL_TARGET_OPENCL_VERSION
-#define CL_TARGET_OPENCL_VERSION 300
-#endif
-
-// Platform includes
-#if defined(_WIN32) || defined(_WIN64)
-  #include <windows.h>
-  // Windows doesn't have unistd.h; provide minimal shims if needed.
-  #ifndef NOMINMAX
-  #define NOMINMAX
-  #endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <fstream>
+#ifdef __APPLE__
+	#include "OpenCL/opencl.h"
 #else
-  #include <unistd.h>
+	#include "CL/opencl.h"
 #endif
 
-// Provide a portable sleep macro in milliseconds (used by some codebases)
-inline void portable_sleep_ms(unsigned int ms) {
-#if defined(_WIN32) || defined(_WIN64)
-    Sleep(ms);
+#ifdef WINDOWS
+#include <Windows.h>
 #else
-    usleep(ms * 1000);
+#include <unistd.h>
 #endif
-}
 
-#endif // COMMON_MACROS_H
+#include "kernel2.h"
+#define KERNEL_1_NUM_OF_KERNELS 1 
+#define KERNEL_2_NUM_OF_KERNELS 2
+#define NUM_OF_FILES 5
+#define NUM_OF_FILES_KERNEL_1 2
+#define NUM_OF_FILES_KERNEL_2 6
+#endif
+

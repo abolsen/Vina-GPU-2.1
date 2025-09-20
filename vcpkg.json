@@ -1,7 +1,6 @@
 {
   "name": "vina-gpu-2-1",
   "version-string": "0",
-  "builtin-baseline": "6b08752f4d78c9c675e6b6d5f4dbe7e44c0a6a8b",
   "dependencies": [
     "opencl",
     "boost-program-options",

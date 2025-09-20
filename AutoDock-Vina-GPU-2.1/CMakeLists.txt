@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(AutoDockVinaGPU21 LANGUAGES CXX)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/shims)
+
 set(TGT "AutoDock-Vina-GPU-2.1")
 
 set(CMAKE_CXX_STANDARD 17)

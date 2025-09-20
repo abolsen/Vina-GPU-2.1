@@ -1,153 +1,25 @@
-name: build-and-release
-
+name: release
 on:
   push:
     tags:
-      - "v*"
-  workflow_dispatch:
-
-permissions:
-  contents: write  # required for creating/uploading Release assets
-
+      - 'v*'
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            os_slug: linux
-            shell: bash
-          - os: windows-2022
-            os_slug: windows
-            shell: pwsh
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # ---------- Linux deps ----------
-      - name: Install deps (Linux)
-        if: startsWith(matrix.os, 'ubuntu')
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake pkg-config \
-            libboost-all-dev ocl-icd-opencl-dev
-
-      # ---------- Windows deps via vcpkg ----------
-      - name: Set up vcpkg (Windows)
-        if: startsWith(matrix.os, 'windows')
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ github.workspace }}/vcpkg
-          # If your repo has vcpkg.json, this will restore/install automatically.
-          runVcpkgInstall: true
-
-      # ---------- Build AutoDock-Vina-GPU-2.1 ----------
-      - name: Build AutoDock-Vina-GPU-2.1
-        shell: ${{ matrix.shell }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ("${{ matrix.os_slug }}" -eq "linux") {
-            set -euo pipefail
-            ulimit -s 8192
-            cmake -S AutoDock-Vina-GPU-2.1 -B build-av -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-av --config Release -j
-          } else {
-            cmake -S AutoDock-Vina-GPU-2.1 -B build-av -A x64 `
-              -DCMAKE_BUILD_TYPE=Release `
-              -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
-            cmake --build build-av --config Release
-          }
-
-      # ---------- Build QuickVina-W-GPU-2.1 ----------
-      - name: Build QuickVina-W-GPU-2.1
-        shell: ${{ matrix.shell }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ("${{ matrix.os_slug }}" -eq "linux") {
-            set -euo pipefail
-            ulimit -s 8192
-            cmake -S QuickVina-W-GPU-2.1 -B build-qvw -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-qvw --config Release -j
-          } else {
-            cmake -S QuickVina-W-GPU-2.1 -B build-qvw -A x64 `
-              -DCMAKE_BUILD_TYPE=Release `
-              -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
-            cmake --build build-qvw --config Release
-          }
-
-      # ---------- Build QuickVina2-GPU-2.1 ----------
-      - name: Build QuickVina2-GPU-2.1
-        shell: ${{ matrix.shell }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ("${{ matrix.os_slug }}" -eq "linux") {
-            set -euo pipefail
-            ulimit -s 8192
-            cmake -S QuickVina2-GPU-2.1 -B build-qv2 -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-qv2 --config Release -j
-          } else {
-            cmake -S QuickVina2-GPU-2.1 -B build-qv2 -A x64 `
-              -DCMAKE_BUILD_TYPE=Release `
-              -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
-            cmake --build build-qv2 --config Release
-          }
-
-      # ---------- Collect binaries + hashes ----------
-      - name: Collect & hash
-        shell: ${{ matrix.shell }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if ("${{ matrix.os_slug }}" -eq "linux") {
-            set -euo pipefail
-            mkdir -p dist/linux
-            cp build-av/AutoDock-Vina-GPU-2.1 dist/linux/ || cp build-av/Release/AutoDock-Vina-GPU-2.1 dist/linux/
-            cp build-qvw/QuickVina-W-GPU-2.1 dist/linux/ || cp build-qvw/Release/QuickVina-W-GPU-2.1 dist/linux/
-            cp build-qv2/QuickVina2-GPU-2.1 dist/linux/ || cp build-qv2/Release/QuickVina2-GPU-2.1 dist/linux/
-            (cd dist/linux && sha256sum * > SHA256SUMS.txt)
-          } else {
-            New-Item -Force -ItemType Directory -Path dist\windows | Out-Null
-            Copy-Item build-av\Release\AutoDock-Vina-GPU-2.1.exe dist\windows\
-            Copy-Item build-qvw\Release\QuickVina-W-GPU-2.1.exe dist\windows\
-            Copy-Item build-qv2\Release\QuickVina2-GPU-2.1.exe dist\windows\
-            Push-Location dist\windows
-            Get-ChildItem -File | ForEach-Object {
-              $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
-              "$($._.Name)  $h" | Out-File -FilePath SHA256SUMS.txt -Append -Encoding ascii
-            }
-            Pop-Location
-          }
-
-      - name: Upload artifacts (${{ matrix.os_slug }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: vina-gpu-2.1-${{ matrix.os_slug }}
-          path: |
-            dist/${{ matrix.os_slug }}/**
-
   release:
-    name: Create GitHub Release
     runs-on: ubuntu-22.04
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: release-assets
-
-      - name: List assets (debug)
-        run: find release-assets -type f -maxdepth 3 -print
-
-      - name: Publish to GitHub Release
+          name: vina-gpu-2.1-linux-x86_64
+          path: rel/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: vina-gpu-2.1-windows-x64
+          path: rel/windows
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-assets/**/*
+            rel/linux/**
+            rel/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

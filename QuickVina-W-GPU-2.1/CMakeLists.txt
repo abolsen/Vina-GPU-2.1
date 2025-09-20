@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(QuickVinaWGPU21 LANGUAGES CXX)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/shims)
+
 set(TGT "QuickVina-W-GPU-2.1")
 
 set(CMAKE_CXX_STANDARD 17)
