@@ -1,107 +1,71 @@
 name: build-windows
+
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
     runs-on: windows-2022
+
     env:
       VCPKG_DEFAULT_TRIPLET: x64-windows
+      VCPKG_BINARY_SOURCES: "clear;cache,artifact,readwrite"   # use gha artifact cache
+      CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: MSVC dev shell
-        uses: ilammy/msvc-dev-cmd@v1
+      # vcpkg in MANIFEST mode; speeds up subsequent runs via cache
+      - name: Setup vcpkg (manifest mode, with cache)
+        uses: lukka/run-vcpkg@v11
+        with:
+          # Known good commit; change if you need a newer vcpkg
+          vcpkgGitCommitId: "06f1db66c3b3d6b0b9e4bc2a8a6a6a1743e5a3a7"
 
-      - name: Add Boost convenience.hpp compat header
+      # Configure & build AutoDock-Vina-GPU-2.1
+      - name: Configure AutoDock-Vina-GPU-2.1
+        run: >
+          cmake -S AutoDock-Vina-GPU-2.1 -B build-av
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.CMAKE_TOOLCHAIN_FILE }}"
+          -DBoost_USE_STATIC_LIBS=OFF
+          -DCMAKE_CXX_FLAGS="/I${{ github.workspace }}\shims /DBOOST_TIMER_ENABLE_DEPRECATED /D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
+
+      - name: Build AutoDock-Vina-GPU-2.1
+        run: cmake --build build-av --config Release -j 4
+
+      # Configure & build QuickVina2-GPU-2.1
+      - name: Configure QuickVina2-GPU-2.1
+        run: >
+          cmake -S QuickVina2-GPU-2.1 -B build-qv2
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.CMAKE_TOOLCHAIN_FILE }}"
+          -DBoost_USE_STATIC_LIBS=OFF
+          -DCMAKE_CXX_FLAGS="/I${{ github.workspace }}\shims /DBOOST_TIMER_ENABLE_DEPRECATED /D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING"
+
+      - name: Build QuickVina2-GPU-2.1
+        run: cmake --build build-qv2 --config Release -j 4
+
+      # Collect binaries and write SHA256 sums
+      - name: Collect & hash
         shell: pwsh
         run: |
-          $compat = Join-Path "${{ github.workspace }}" "AutoDock-Vina-GPU-2.1\compat\include\boost\filesystem"
-          New-Item -ItemType Directory -Force -Path $compat | Out-Null
-          @"
-          #ifndef BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
-          #define BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
-          #include <boost/filesystem/operations.hpp>
-          #include <boost/filesystem/path.hpp>
-          #endif
-          "@ | Set-Content -Encoding ASCII (Join-Path $compat "convenience.hpp")
-          # Also mirror into the other two method dirs to be safe
-          foreach ($d in @("QuickVina-W-GPU-2.1","QuickVina2-GPU-2.1")) {
-            $p = Join-Path "${{ github.workspace }}" "$d\compat\include\boost\filesystem"
-            New-Item -ItemType Directory -Force -Path $p | Out-Null
-            Copy-Item (Join-Path $compat "convenience.hpp") -Destination (Join-Path $p "convenience.hpp") -Force
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path dist\windows | Out-Null
+          $bins = @(
+            "build-av\Release\AutoDock-Vina-GPU-2.1.exe",
+            "build-qv2\Release\QuickVina2-GPU-2.1.exe"
+          )
+          foreach ($b in $bins) {
+            if (Test-Path $b) { Copy-Item $b dist\windows\ }
           }
+          Push-Location dist\windows
+          Get-ChildItem -File | ForEach-Object {
+            $h = Get-FileHash -Algorithm SHA256 $_.FullName
+            "$($h.Hash)  $($_.Name)"
+          } | Set-Content -Path SHA256SUMS.txt
+          Pop-Location
 
-      - name: Install vcpkg (classic) and required ports
-        shell: pwsh
-        run: |
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
-          & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
-            boost:x64-windows `
-            boost-program-options:x64-windows `
-            boost-filesystem:x64-windows `
-            boost-system:x64-windows `
-            boost-serialization:x64-windows `
-            boost-random:x64-windows `
-            boost-timer:x64-windows `
-            boost-math:x64-windows `
-            opencl:x64-windows
-
-      - name: Configure & build AutoDock-Vina-GPU-2.1
-        shell: pwsh
-        run: |
-          cmake -S AutoDock-Vina-GPU-2.1 -B build-av `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-av --config Release -j
-
-      - name: Configure & build QuickVina-W-GPU-2.1
-        shell: pwsh
-        run: |
-          cmake -S QuickVina-W-GPU-2.1 -B build-qvw `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-qvw --config Release -j
-
-      - name: Configure & build QuickVina2-GPU-2.1
-        shell: pwsh
-        run: |
-          cmake -S QuickVina2-GPU-2.1 -B build-qv2 `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-qv2 --config Release -j
-
-          - name: Collect & hash
-          shell: pwsh
-          run: |
-            $ErrorActionPreference = 'Stop'
-            $dir = "dist\windows"
-            New-Item -Force -ItemType Directory -Path $dir | Out-Null
-        
-            # Copy the three exes (Release or non-Release fallback)
-            $bins = @(
-              "build-av\Release\AutoDock-Vina-GPU-2.1.exe",
-              "build-qvw\Release\QuickVina-W-GPU-2.1.exe",
-              "build-qv2\Release\QuickVina2-GPU-2.1.exe"
-            )
-            foreach ($b in $bins) {
-              if (Test-Path $b) { Copy-Item $b $dir -Force }
-              else {
-                $fallback = $b -replace "\\Release\\", "\"
-                if (Test-Path $fallback) { Copy-Item $fallback $dir -Force }
-                else { Write-Error "Missing artifact: $b (and fallback $fallback)" }
-              }
-            }
-        
-            # Write SHA256SUMS.txt in 'hash  filename' format
-            $files = Get-ChildItem $dir -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" }
-            $lines = foreach ($f in $files) {
-              $h = Get-FileHash -Path $f.FullName -Algorithm SHA256
-              "$($h.Hash)  $($f.Name)"
-            }
-            Set-Content -Path (Join-Path $dir "SHA256SUMS.txt") -Value $lines -Encoding ASCII        
-
-      - name: Upload artifacts
+      - name: Upload artifacts (windows)
         uses: actions/upload-artifact@v4
         with:
           name: vina-gpu-2.1-windows-x64

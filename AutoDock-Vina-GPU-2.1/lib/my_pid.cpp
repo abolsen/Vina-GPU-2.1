@@ -1,48 +1,13 @@
-/*
+#include <cstdlib>
 
-   Copyright (c) 2006-2010, The Scripps Research Institute
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-   Author: Dr. Oleg Trott <ot14@columbia.edu>, 
-           The Olson Lab, 
-           The Scripps Research Institute
-
-*/
-
-
-/*
-*如果定义了WIN32，将包含头文件Windows.h，否则包含头文件unistd.h
-*/
-
-#ifdef WINDOWS
-#include <Windows.h>
+#if defined(_WIN32) || defined(_WIN64)
+  #include <windows.h>
+  static inline int my_pid() {
+      return static_cast<int>(::GetCurrentProcessId());
+  }
 #else
-#include <unistd.h>
+  #include <unistd.h>
+  static inline int my_pid() {
+      return static_cast<int>(::getpid());
+  }
 #endif
-
-/*
-*包含头文件my_pid.h
-*/
-
-#include "my_pid.h"
-
-//如果定义了WIN32，利用GetCurrentProcessId()返回当前进程的进程ID，否则利用getpid()返回当前进程的进程ID
-int my_pid() {
-#ifdef WINDOWS
-	return GetCurrentProcessId();
-#else
-	return getpid();
-#endif
-}
-
