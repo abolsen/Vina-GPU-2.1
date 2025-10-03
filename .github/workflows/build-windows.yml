@@ -16,7 +16,7 @@ jobs:
       SRC_DIR: ${{ github.workspace }}\AutoDock-Vina-GPU-2.1
       COMPAT_DIR: ${{ github.workspace }}\ci\compat
       VCPKG_DEFAULT_TRIPLET: x64-windows
-      VCPKG_FEATURE_FLAGS: manifests # explicit (usually default on GH runners)
+      VCPKG_FEATURE_FLAGS: manifests
 
     steps:
       - name: Checkout
@@ -41,7 +41,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vcpkg-
 
-      # Manifest-mode install: do NOT list packages here
+      # Install OpenCL in classic mode OUTSIDE the manifest directory
+      - name: Install OpenCL (classic mode)
+        shell: pwsh
+        working-directory: ${{ env.VCPKG_ROOT }}
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install opencl --triplet x64-windows --classic
+
+      # Now install the rest via your repo's manifest
       - name: vcpkg install (manifest mode)
         shell: pwsh
         working-directory: ${{ github.workspace }}
