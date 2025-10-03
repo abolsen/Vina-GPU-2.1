@@ -30,6 +30,12 @@ jobs:
           git clone --depth 1 https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
           & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
 
+      - name: Install Boost.Math (classic mode)
+        shell: pwsh
+        working-directory: ${{ env.VCPKG_ROOT }}
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install boost-math --triplet x64-windows --classic
+        
       - name: Cache vcpkg artifacts
         uses: actions/cache@v4
         with:
@@ -59,12 +65,14 @@ jobs:
           & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows
 
       # --- Compatibility shims to build against modern Boost + Windows ---
-      - name: Create compatibility headers
+      - name: Create compatibility headers (+ Windows option TU)
         shell: pwsh
         run: |
+          # Folders
           New-Item -ItemType Directory -Force -Path "$env:COMPAT_DIR\boost\filesystem" | Out-Null
           New-Item -ItemType Directory -Force -Path "$env:COMPAT_DIR\boost\ptr_container" | Out-Null
       
+          # 1) Legacy Boost convenience.hpp shim (unchanged)
           @'
           #pragma once
           #include <boost/version.hpp>
@@ -78,41 +86,40 @@ jobs:
           }}
           '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\boost\filesystem\convenience.hpp"
       
+          # 2) Minimal Boost.PtrContainer shim
           @'
           #pragma once
           #include <vector>
           #include <memory>
           #include <cstddef>
           namespace boost { namespace ptr_container {
-              template <class T>
-              class ptr_vector {
-                  using storage_t = std::vector<std::unique_ptr<T>>;
-                  storage_t data_;
-              public:
-                  using value_type = T;
-                  using size_type = std::size_t;
-                  using iterator = typename storage_t::iterator;
-                  using const_iterator = typename storage_t::const_iterator;
-      
-                  void push_back(T* p) { data_.emplace_back(p); }
-                  size_type size() const noexcept { return data_.size(); }
-                  bool empty() const noexcept { return data_.empty(); }
-                  void clear() noexcept { data_.clear(); }
-                  void reserve(size_type n) { data_.reserve(n); }
-      
-                  T& operator[](size_type i) { return *data_[i]; }
-                  const T& operator[](size_type i) const { return *data_[i]; }
-                  T& back() { return *data_.back(); }
-                  const T& back() const { return *data_.back(); }
-      
-                  iterator begin() { return data_.begin(); }
-                  iterator end() { return data_.end(); }
-                  const_iterator begin() const { return data_.begin(); }
-                  const_iterator end() const { return data_.end(); }
-              };
+            template <class T>
+            class ptr_vector {
+              using storage_t = std::vector<std::unique_ptr<T>>;
+              storage_t data_;
+            public:
+              using value_type = T;
+              using size_type = std::size_t;
+              using iterator = typename storage_t::iterator;
+              using const_iterator = typename storage_t::const_iterator;
+              void push_back(T* p) { data_.emplace_back(p); }
+              size_type size() const noexcept { return data_.size(); }
+              bool empty() const noexcept { return data_.empty(); }
+              void clear() noexcept { data_.clear(); }
+              void reserve(size_type n) { data_.reserve(n); }
+              T& operator[](size_type i) { return *data_[i]; }
+              const T& operator[](size_type i) const { return *data_[i]; }
+              T& back() { return *data_.back(); }
+              const T& back() const { return *data_.back(); }
+              iterator begin() { return data_.begin(); }
+              iterator end() { return data_.end(); }
+              const_iterator begin() const { return data_.begin(); }
+              const_iterator end() const { return data_.end(); }
+            };
           }}
           '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\boost\ptr_container\ptr_vector.hpp"
       
+          # 3) Minimal unistd.h shim (unchanged)
           @'
           #pragma once
           #ifdef _WIN32
@@ -130,20 +137,22 @@ jobs:
           #endif
           '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\unistd.h"
       
-          # C++11-safe definition for the global 'option' used in wrapcl.cpp
+          # 4) Declare 'option' (no macros) and define it in a TU we add via file(GLOB)
           @'
           #pragma once
           #include <string>
-          static std::string& vina_windows_option() {
-            static std::string opt("-cl-mad-enable -cl-fast-relaxed-math");
-            return opt;
-          }
-          // Make existing code that uses a variable named `option` see the same object.
-          #ifndef option
-          #define option (vina_windows_option())
-          #endif
-          '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\windows_inline_fix.h"      
-
+          extern std::string option;
+          '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\windows_option_decl.h"
+      
+          # Create a source file inside OpenCL/src so your existing GLOB picks it up
+          $optSrc = @'
+          #include <string>
+          // Windows definition for the global OpenCL build options expected by wrapcl.cpp
+          std::string option = "-cl-mad-enable -cl-fast-relaxed-math";
+          '@
+          $optPath = Join-Path "$env:SRC_DIR\OpenCL\src" "windows_option.cpp"
+          Set-Content -Encoding ASCII $optPath $optSrc
+      
       - name: Configure (CMake + MSVC)
         shell: pwsh
         run: |
@@ -154,8 +163,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_POLICY_DEFAULT_CMP0167=NEW `
             -DCMAKE_CXX_STANDARD=17 -DCMAKE_CXX_STANDARD_REQUIRED=ON `
-            -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX /EHsc /permissive- /FI$env:SRC_DIR\OpenCL\inc\linux_fix.h /FI$env:COMPAT_DIR\windows_inline_fix.h"
-      
+            -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX /EHsc /permissive- /FI$env:SRC_DIR\OpenCL\inc\linux_fix.h /FI$env:COMPAT_DIR\windows_option_decl.h"
 
       - name: Build (Release)
         shell: pwsh
