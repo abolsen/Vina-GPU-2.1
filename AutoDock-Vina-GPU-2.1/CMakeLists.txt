@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
+cmake_policy(SET CMP0167 NEW)  # use BoostConfig.cmake instead of the removed module
 project(AutoDockVinaGPU21 LANGUAGES CXX)
 
 set(TGT "AutoDock-Vina-GPU-2.1")
@@ -7,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenCL REQUIRED)
-find_package(Boost 1.65 REQUIRED
+find_package(Boost 1.65 CONFIG REQUIRED
   COMPONENTS program_options filesystem system serialization random timer thread)
 
 file(GLOB SRC_LIB     "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp")
@@ -23,10 +24,16 @@ target_include_directories(${TGT} PRIVATE
 )
 
 # Prefer OpenCL 3.0; keep others opt-in if you need
-target_compile_definitions(${TGT} PRIVATE OPENCL_3_0)
+target_compile_definitions(${TGT} PRIVATE
+  BOOST_TIMER_ENABLE_DEPRECATED
+  OPENCL_3_0
+)
 
 if (MSVC)
-  target_compile_definitions(${TGT} PRIVATE _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
+  target_compile_definitions(${TGT} PRIVATE
+    _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+    WIN32_LEAN_AND_MEAN NOMINMAX
+  )
 endif()
 
 find_package(Threads REQUIRED)
