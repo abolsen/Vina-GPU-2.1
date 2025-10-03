@@ -1,108 +1,130 @@
-name: build-windows
-on: [push, pull_request, workflow_dispatch]
+name: Windows MSVC build (Vina-GPU-2.1)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: windows-2022
-    env:
-      VCPKG_DEFAULT_TRIPLET: x64-windows
-    steps:
-      - uses: actions/checkout@v4
+  build-windows:
+    runs-on: windows-latest
 
-      - name: MSVC dev shell
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Ensure MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Add Boost convenience.hpp compat header
+      - name: Bootstrap vcpkg
         shell: pwsh
         run: |
-          $compat = Join-Path "${{ github.workspace }}" "AutoDock-Vina-GPU-2.1\compat\include\boost\filesystem"
-          New-Item -ItemType Directory -Force -Path $compat | Out-Null
-          @"
-          #ifndef BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
-          #define BOOST_FILESYSTEM_CONVENIENCE_HPP_COMPAT
-          #include <boost/filesystem/operations.hpp>
-          #include <boost/filesystem/path.hpp>
-          #endif
-          "@ | Set-Content -Encoding ASCII (Join-Path $compat "convenience.hpp")
-          # Also mirror into the other two method dirs to be safe
-          foreach ($d in @("QuickVina-W-GPU-2.1","QuickVina2-GPU-2.1")) {
-            $p = Join-Path "${{ github.workspace }}" "$d\compat\include\boost\filesystem"
-            New-Item -ItemType Directory -Force -Path $p | Out-Null
-            Copy-Item (Join-Path $compat "convenience.hpp") -Destination (Join-Path $p "convenience.hpp") -Force
+          if (!(Test-Path "$env:GITHUB_WORKSPACE/vcpkg/vcpkg.exe")) {
+            & "$env:GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
           }
 
-      - name: Install vcpkg (classic) and required ports
+      - name: Cache vcpkg artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg/installed
+            vcpkg/buildtrees
+            vcpkg/packages
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Install deps (OpenCL + Boost components)
         shell: pwsh
         run: |
-          git clone --depth 1 https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg"
-          & "${{ github.workspace }}\vcpkg\bootstrap-vcpkg.bat"
-          & "${{ github.workspace }}\vcpkg\vcpkg.exe" install --classic `
-            boost:x64-windows `
-            boost-program-options:x64-windows `
-            boost-filesystem:x64-windows `
-            boost-system:x64-windows `
-            boost-serialization:x64-windows `
-            boost-random:x64-windows `
-            boost-timer:x64-windows `
-            boost-math:x64-windows `
-            opencl:x64-windows
+          $triplet = "x64-windows"
+          $pkgs = @(
+            "opencl",
+            "boost-program-options",
+            "boost-filesystem",
+            "boost-system",
+            "boost-serialization",
+            "boost-random",
+            "boost-timer",
+            "boost-thread"
+          ) | ForEach-Object { "$_:$triplet" } | Join-String " "
+          & "$env:GITHUB_WORKSPACE/vcpkg/vcpkg.exe" install $pkgs
 
-      - name: Configure & build AutoDock-Vina-GPU-2.1
+      - name: Create compatibility headers (unistd + convenience.hpp)
         shell: pwsh
         run: |
-          cmake -S AutoDock-Vina-GPU-2.1 -B build-av `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-av --config Release -j
+          $compat = Join-Path $env:GITHUB_WORKSPACE "compat"
+          New-Item -ItemType Directory -Force -Path $compat | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $compat "boost/filesystem") | Out-Null
 
-      - name: Configure & build QuickVina-W-GPU-2.1
+          # Minimal unistd.h for MSVC
+          @"
+          #pragma once
+          #ifdef _MSC_VER
+            #include <windows.h>
+            #include <process.h>
+            #include <io.h>
+            #include <direct.h>
+            #include <stdint.h>
+            // micros->ms (round up at least 1 ms if nonzero)
+            #ifndef usleep
+              static inline void usleep(unsigned int usec) { Sleep((usec + 999) / 1000); }
+            #endif
+            #ifndef sleep
+              static inline unsigned int sleep(unsigned int sec) { Sleep(sec * 1000); return 0; }
+            #endif
+            #ifndef getpid
+              #define getpid _getpid
+            #endif
+            #ifndef access
+              #define access _access
+            #endif
+            #ifndef F_OK
+              #define F_OK 0
+            #endif
+            #ifndef R_OK
+              #define R_OK 4
+            #endif
+          #else
+            #include_next <unistd.h>
+          #endif
+          "@ | Set-Content -Encoding ASCII (Join-Path $compat "unistd.h")
+
+                    # Shim for removed Boost header
+                    @"
+          #pragma once
+          #include <boost/filesystem.hpp>
+          "@ | Set-Content -Encoding ASCII (Join-Path $compat "boost/filesystem/convenience.hpp")
+
+      - name: Configure (CMake + vcpkg toolchain)
         shell: pwsh
         run: |
-          cmake -S QuickVina-W-GPU-2.1 -B build-qvw `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-qvw --config Release -j
+          $ws = $env:GITHUB_WORKSPACE
+          $src = Join-Path $ws "AutoDock-Vina-GPU-2.1"
+          $bld = Join-Path $ws "build-av"
+          $toolchain = Join-Path $ws "vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-      - name: Configure & build QuickVina2-GPU-2.1
+          cmake -S "$src" -B "$bld" `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_STANDARD=17 `
+            -DCMAKE_POLICY_DEFAULT_CMP0167=NEW `
+            -DCL_TARGET_OPENCL_VERSION=300 `
+            "-DCMAKE_CXX_FLAGS=/I`"$ws\compat`" /DCL_TARGET_OPENCL_VERSION=300 /DBOOST_TIMER_ENABLE_DEPRECATED=1 /D_CRT_SECURE_NO_WARNINGS"
+
+      - name: Build (Release)
         shell: pwsh
         run: |
-          cmake -S QuickVina2-GPU-2.1 -B build-qv2 `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-qv2 --config Release -j
+          cmake --build "$env:GITHUB_WORKSPACE/build-av" --config Release -m
 
-          - name: Collect & hash
-          shell: pwsh
-          run: |
-            $ErrorActionPreference = 'Stop'
-            $dir = "dist\windows"
-            New-Item -Force -ItemType Directory -Path $dir | Out-Null
-        
-            # Copy the three exes (Release or non-Release fallback)
-            $bins = @(
-              "build-av\Release\AutoDock-Vina-GPU-2.1.exe",
-              "build-qvw\Release\QuickVina-W-GPU-2.1.exe",
-              "build-qv2\Release\QuickVina2-GPU-2.1.exe"
-            )
-            foreach ($b in $bins) {
-              if (Test-Path $b) { Copy-Item $b $dir -Force }
-              else {
-                $fallback = $b -replace "\\Release\\", "\"
-                if (Test-Path $fallback) { Copy-Item $fallback $dir -Force }
-                else { Write-Error "Missing artifact: $b (and fallback $fallback)" }
-              }
-            }
-        
-            # Write SHA256SUMS.txt in 'hash  filename' format
-            $files = Get-ChildItem $dir -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" }
-            $lines = foreach ($f in $files) {
-              $h = Get-FileHash -Path $f.FullName -Algorithm SHA256
-              "$($h.Hash)  $($f.Name)"
-            }
-            Set-Content -Path (Join-Path $dir "SHA256SUMS.txt") -Value $lines -Encoding ASCII        
-
-      - name: Upload artifacts
+      - name: Upload EXEs
         uses: actions/upload-artifact@v4
         with:
-          name: vina-gpu-2.1-windows-x64
-          path: dist/windows/**
+          name: Vina-GPU-windows-binaries
+          path: |
+            build-av/Release/*.exe
+            build-av/*.exe
+          if-no-files-found: warn
