@@ -16,6 +16,7 @@ jobs:
       SRC_DIR: ${{ github.workspace }}\AutoDock-Vina-GPU-2.1
       COMPAT_DIR: ${{ github.workspace }}\ci\compat
       VCPKG_DEFAULT_TRIPLET: x64-windows
+      VCPKG_FEATURE_FLAGS: manifests # explicit (usually default on GH runners)
 
     steps:
       - name: Checkout
@@ -29,33 +30,23 @@ jobs:
           git clone --depth 1 https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
           & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
 
-      - name: Cache vcpkg installed
+      - name: Cache vcpkg artifacts
         uses: actions/cache@v4
         with:
           path: |
             ${{ env.VCPKG_ROOT }}\installed
             ${{ env.VCPKG_ROOT }}\buildtrees
             ${{ env.VCPKG_ROOT }}\packages
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}-manual
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json', '**/vcpkg-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-vcpkg-
 
-      - name: Preinstall libs with vcpkg (OpenCL + Boost)
+      # Manifest-mode install: do NOT list packages here
+      - name: vcpkg install (manifest mode)
         shell: pwsh
+        working-directory: ${{ github.workspace }}
         run: |
-          $args = @(
-            'install',
-            'opencl',
-            'boost-program-options',
-            'boost-filesystem',
-            'boost-system',
-            'boost-serialization',
-            'boost-random',
-            'boost-timer',
-            'boost-thread',
-            '--triplet','x64-windows'
-          )
-          & "$env:VCPKG_ROOT\vcpkg.exe" @args
+          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows
 
       # --- Compatibility shims to build against modern Boost + Windows ---
       - name: Create compatibility headers
