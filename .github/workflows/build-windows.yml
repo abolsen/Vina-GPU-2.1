@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-vcpkg-
 
       - name: Preinstall libs with vcpkg (OpenCL + Boost)
-        shell: pwsh
+        shell: cmd
         run: |
           & "$env:VCPKG_ROOT\vcpkg.exe" install ^
             opencl ^
