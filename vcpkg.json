@@ -9,6 +9,7 @@
     "boost-serialization",
     "boost-random",
     "boost-timer",
-    "boost-thread"
+    "boost-thread",
+    "boost-math"
   ]
 }
