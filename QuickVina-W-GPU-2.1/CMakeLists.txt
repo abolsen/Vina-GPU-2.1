@@ -8,8 +8,19 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(OpenCL REQUIRED)
-find_package(Boost 1.65 CONFIG REQUIRED
-  COMPONENTS program_options filesystem system serialization random timer thread)
+# --- Boost discovery (vcpkg config-mode on Windows CI, module fallback elsewhere) ---
+if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
+  cmake_policy(SET CMP0167 NEW)  # prefer BoostConfig.cmake
+  find_package(Boost 1.65 CONFIG REQUIRED
+    COMPONENTS program_options filesystem system serialization random timer thread)
+else()
+  find_package(Boost 1.65 REQUIRED
+    COMPONENTS program_options filesystem system serialization random timer thread)
+endif()
+
+# enable deprecated boost::progress header while we migrate
+add_compile_definitions(BOOST_TIMER_ENABLE_DEPRECATED)
+
 
 file(GLOB SRC_LIB     "${CMAKE_CURRENT_SOURCE_DIR}/lib/*.cpp")
 file(GLOB SRC_OPENCL  "${CMAKE_CURRENT_SOURCE_DIR}/OpenCL/src/*.cpp")

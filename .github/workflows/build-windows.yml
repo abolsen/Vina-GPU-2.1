@@ -52,6 +52,9 @@ jobs:
       - name: vcpkg install (manifest mode)
         shell: pwsh
         working-directory: ${{ github.workspace }}
+        env:
+          VCPKG_FEATURE_FLAGS: manifests
+          VCPKG_DEFAULT_TRIPLET: x64-windows
         run: |
           & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows
 
@@ -100,11 +103,12 @@ jobs:
         run: |
           cmake -S "$env:SRC_DIR" -B "$env:BUILD_DIR" -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_MANIFEST_DIR="$env:GITHUB_WORKSPACE" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_POLICY_DEFAULT_CMP0167=NEW `
-            -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX"
-        
+            -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX /EHsc /permissive-"
+      
 
       - name: Build (Release)
         shell: pwsh
