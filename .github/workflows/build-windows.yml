@@ -15,6 +15,7 @@ jobs:
       BUILD_DIR: ${{ github.workspace }}\build-av
       SRC_DIR: ${{ github.workspace }}\AutoDock-Vina-GPU-2.1
       COMPAT_DIR: ${{ github.workspace }}\ci\compat
+      VCPKG_DEFAULT_TRIPLET: x64-windows
 
     steps:
       - name: Checkout
@@ -40,18 +41,21 @@ jobs:
             ${{ runner.os }}-vcpkg-
 
       - name: Preinstall libs with vcpkg (OpenCL + Boost)
-        shell: cmd
+        shell: pwsh
         run: |
-          "%VCPKG_ROOT%\vcpkg.exe" install ^
-            opencl ^
-            boost-program-options ^
-            boost-filesystem ^
-            boost-system ^
-            boost-serialization ^
-            boost-random ^
-            boost-timer ^
-            boost-thread ^
-            --triplet x64-windows
+          $args = @(
+            'install',
+            'opencl',
+            'boost-program-options',
+            'boost-filesystem',
+            'boost-system',
+            'boost-serialization',
+            'boost-random',
+            'boost-timer',
+            'boost-thread',
+            '--triplet','x64-windows'
+          )
+          & "$env:VCPKG_ROOT\vcpkg.exe" @args
 
       # --- Compatibility shims to build against modern Boost + Windows ---
       - name: Create compatibility headers
@@ -64,11 +68,13 @@ jobs:
           #pragma once
           #include <boost/version.hpp>
           #include <boost/filesystem.hpp>
-          // Legacy helpers removed in newer Boost, provide minimal shims:
+          // Reintroduce legacy convenience API that some older code expects.
           namespace boost { namespace filesystem {
               inline std::string basename(const path& p) { return p.stem().string(); }
               inline std::string extension(const path& p) { return p.extension().string(); }
-              inline path change_extension(const path& p, const path& new_ext) { path q = p; q.replace_extension(new_ext); return q; }
+              inline path change_extension(const path& p, const path& new_ext) {
+                  path q = p; q.replace_extension(new_ext); return q;
+              }
               inline std::string leaf(const path& p) { return p.filename().string(); }
               inline std::string no_extension(const path& p) { return p.stem().string(); }
           }}
