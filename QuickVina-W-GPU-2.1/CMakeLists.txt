@@ -12,10 +12,12 @@ find_package(OpenCL REQUIRED)
 if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
   cmake_policy(SET CMP0167 NEW)  # prefer BoostConfig.cmake
   find_package(Boost 1.65 CONFIG REQUIRED
-    COMPONENTS program_options filesystem system serialization random timer thread)
+    COMPONENTS headers program_options filesystem system serialization random timer thread)
 else()
   find_package(Boost 1.65 REQUIRED
     COMPONENTS program_options filesystem system serialization random timer thread)
+  # Make sure headers are visible when using the classic FindBoost module
+  include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
 # enable deprecated boost::progress header while we migrate
@@ -51,10 +53,12 @@ find_package(Threads REQUIRED)
 
 target_link_libraries(${TGT} PRIVATE
   OpenCL::OpenCL
+  Boost::headers
   Boost::program_options Boost::filesystem Boost::system
   Boost::serialization Boost::random Boost::timer Boost::thread
   Threads::Threads
 )
+
 
 if (NOT MSVC)
   target_link_libraries(${TGT} PRIVATE stdc++fs)
