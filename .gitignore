@@ -60,7 +60,7 @@ dist/
 vcpkg_installed/
 .vcpkg-root
 .vscode/settings.json
-vcpkg/
+#vcpkg/
 
 # OS junk
 .DS_Store
