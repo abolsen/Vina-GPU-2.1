@@ -101,3 +101,9 @@ jobs:
           # write checksums
           (cd "$outdir" && sha256sum * > SHA256SUMS.txt)
         
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vina-GPU-2.1_linux_x64_Release
+          path: |
+            dist/linux/*

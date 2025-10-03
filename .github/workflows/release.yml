@@ -1,0 +1,68 @@
+name: create-release
+
+on:
+  push:
+    tags:
+      - 'v*'   # e.g. v2.1.0, v2.1.0-rc1
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (for metadata)
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts (all)
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Repackage archives
+        run: |
+          set -euo pipefail
+          ls -R dist || true
+          mkdir -p out
+
+          # Expect these two artifact folders/files from prior workflows:
+          #  - Vina-GPU-2.1_windows_x64_Release (your Windows workflow)
+          #  - Vina-GPU-2.1_linux_x64_Release  (Linux workflow we just patched)
+
+          # Windows -> zip
+          if [ -d "dist/Vina-GPU-2.1_windows_x64_Release" ]; then
+            (cd dist/Vina-GPU-2.1_windows_x64_Release && zip -r ../../out/Vina-GPU-2.1-windows-x64.zip .)
+          else
+            echo "Windows artifact not found (dist/Vina-GPU-2.1_windows_x64_Release)" >&2
+          fi
+
+          # Linux -> tar.gz
+          if [ -d "dist/Vina-GPU-2.1_linux_x64_Release" ]; then
+            (cd dist/Vina-GPU-2.1_linux_x64_Release && tar -czf ../../out/Vina-GPU-2.1-linux-x64.tar.gz .)
+          else
+            echo "Linux artifact not found (dist/Vina-GPU-2.1_linux_x64_Release)" >&2
+          fi
+
+          # Include README/LICENSE if present at repo root
+          [ -f README.md ] && cp README.md out/
+          [ -f LICENSE ]   && cp LICENSE out/
+
+          # Checksums
+          (cd out && sha256sum * > SHA256SUMS.txt || true)
+          ls -l out
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            out/Vina-GPU-2.1-windows-x64.zip
+            out/Vina-GPU-2.1-linux-x64.tar.gz
+            out/README.md
+            out/LICENSE
+            out/SHA256SUMS.txt
