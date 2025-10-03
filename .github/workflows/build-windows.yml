@@ -42,7 +42,7 @@ jobs:
       - name: Preinstall libs with vcpkg (OpenCL + Boost)
         shell: cmd
         run: |
-          & "$env:VCPKG_ROOT\vcpkg.exe" install ^
+          "%VCPKG_ROOT%\vcpkg.exe" install ^
             opencl ^
             boost-program-options ^
             boost-filesystem ^
@@ -64,13 +64,11 @@ jobs:
           #pragma once
           #include <boost/version.hpp>
           #include <boost/filesystem.hpp>
-          // Reintroduce legacy convenience API that some older code expects.
+          // Legacy helpers removed in newer Boost, provide minimal shims:
           namespace boost { namespace filesystem {
               inline std::string basename(const path& p) { return p.stem().string(); }
               inline std::string extension(const path& p) { return p.extension().string(); }
-              inline path change_extension(const path& p, const path& new_ext) {
-                  path q = p; q.replace_extension(new_ext); return q;
-              }
+              inline path change_extension(const path& p, const path& new_ext) { path q = p; q.replace_extension(new_ext); return q; }
               inline std::string leaf(const path& p) { return p.filename().string(); }
               inline std::string no_extension(const path& p) { return p.stem().string(); }
           }}
@@ -103,7 +101,8 @@ jobs:
             -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX"
 
       - name: Build (Release)
-        run: cmake --build "%BUILD_DIR%" --config Release -- /m
+        shell: pwsh
+        run: cmake --build "$env:BUILD_DIR" --config Release -- /m
 
       - name: Collect artifacts
         if: always()
