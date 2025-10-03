@@ -1,13 +1,20 @@
-name: Windows MSVC build (Vina-GPU-2.1)
+name: windows-build
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
+  pull_request:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
+
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+      BUILD_DIR: ${{ github.workspace }}\build-av
+      SRC_DIR: ${{ github.workspace }}\AutoDock-Vina-GPU-2.1
+      COMPAT_DIR: ${{ github.workspace }}\ci\compat
 
     steps:
       - name: Checkout
@@ -15,116 +22,101 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Ensure MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-
       - name: Bootstrap vcpkg
         shell: pwsh
         run: |
-          if (!(Test-Path "$env:GITHUB_WORKSPACE/vcpkg/vcpkg.exe")) {
-            & "$env:GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
-          }
+          git clone --depth 1 https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
+          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
 
-      - name: Cache vcpkg artifacts
+      - name: Cache vcpkg installed
         uses: actions/cache@v4
         with:
           path: |
-            vcpkg/installed
-            vcpkg/buildtrees
-            vcpkg/packages
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+            ${{ env.VCPKG_ROOT }}\installed
+            ${{ env.VCPKG_ROOT }}\buildtrees
+            ${{ env.VCPKG_ROOT }}\packages
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/vcpkg.json') }}-manual
           restore-keys: |
             ${{ runner.os }}-vcpkg-
 
-      - name: Install deps (OpenCL + Boost components)
+      - name: Preinstall libs with vcpkg (OpenCL + Boost)
         shell: pwsh
         run: |
-          $triplet = "x64-windows"
-          $pkgs = @(
-            "opencl",
-            "boost-program-options",
-            "boost-filesystem",
-            "boost-system",
-            "boost-serialization",
-            "boost-random",
-            "boost-timer",
-            "boost-thread"
-          ) | ForEach-Object { "$_:$triplet" } | Join-String " "
-          & "$env:GITHUB_WORKSPACE/vcpkg/vcpkg.exe" install $pkgs
+          & "$env:VCPKG_ROOT\vcpkg.exe" install ^
+            opencl ^
+            boost-program-options ^
+            boost-filesystem ^
+            boost-system ^
+            boost-serialization ^
+            boost-random ^
+            boost-timer ^
+            boost-thread ^
+            --triplet x64-windows
 
-      - name: Create compatibility headers (unistd + convenience.hpp)
+      # --- Compatibility shims to build against modern Boost + Windows ---
+      - name: Create compatibility headers
         shell: pwsh
         run: |
-          $compat = Join-Path $env:GITHUB_WORKSPACE "compat"
-          New-Item -ItemType Directory -Force -Path $compat | Out-Null
-          New-Item -ItemType Directory -Force -Path (Join-Path $compat "boost/filesystem") | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:COMPAT_DIR\boost\filesystem" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:COMPAT_DIR" | Out-Null
 
-          # Minimal unistd.h for MSVC
-          @"
+          @'
           #pragma once
-          #ifdef _MSC_VER
-            #include <windows.h>
-            #include <process.h>
-            #include <io.h>
-            #include <direct.h>
-            #include <stdint.h>
-            // micros->ms (round up at least 1 ms if nonzero)
-            #ifndef usleep
-              static inline void usleep(unsigned int usec) { Sleep((usec + 999) / 1000); }
-            #endif
-            #ifndef sleep
-              static inline unsigned int sleep(unsigned int sec) { Sleep(sec * 1000); return 0; }
-            #endif
-            #ifndef getpid
-              #define getpid _getpid
-            #endif
-            #ifndef access
-              #define access _access
-            #endif
-            #ifndef F_OK
-              #define F_OK 0
-            #endif
-            #ifndef R_OK
-              #define R_OK 4
-            #endif
-          #else
-            #include_next <unistd.h>
-          #endif
-          "@ | Set-Content -Encoding ASCII (Join-Path $compat "unistd.h")
-
-                    # Shim for removed Boost header
-                    @"
-          #pragma once
+          #include <boost/version.hpp>
           #include <boost/filesystem.hpp>
-          "@ | Set-Content -Encoding ASCII (Join-Path $compat "boost/filesystem/convenience.hpp")
+          // Reintroduce legacy convenience API that some older code expects.
+          namespace boost { namespace filesystem {
+              inline std::string basename(const path& p) { return p.stem().string(); }
+              inline std::string extension(const path& p) { return p.extension().string(); }
+              inline path change_extension(const path& p, const path& new_ext) {
+                  path q = p; q.replace_extension(new_ext); return q;
+              }
+              inline std::string leaf(const path& p) { return p.filename().string(); }
+              inline std::string no_extension(const path& p) { return p.stem().string(); }
+          }}
+          '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\boost\filesystem\convenience.hpp"
 
-      - name: Configure (CMake + vcpkg toolchain)
+          @'
+          #pragma once
+          #ifdef _WIN32
+          #  include <io.h>
+          #  include <process.h>
+          #  include <direct.h>
+          #  include <windows.h>
+          #  define getpid _getpid
+          #  define access _access
+          #  define unlink _unlink
+          #  define rmdir _rmdir
+          #  define chdir _chdir
+          static inline void usleep(unsigned int usec) { Sleep((usec + 999) / 1000); }
+          static inline void sleep(unsigned int sec) { Sleep(sec * 1000); }
+          #endif
+          '@ | Set-Content -Encoding ASCII "$env:COMPAT_DIR\unistd.h"
+
+      - name: Configure (CMake + MSVC)
         shell: pwsh
         run: |
-          $ws = $env:GITHUB_WORKSPACE
-          $src = Join-Path $ws "AutoDock-Vina-GPU-2.1"
-          $bld = Join-Path $ws "build-av"
-          $toolchain = Join-Path $ws "vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-          cmake -S "$src" -B "$bld" `
-            -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_TOOLCHAIN_FILE="$toolchain" `
+          cmake -S "$env:SRC_DIR" -B "$env:BUILD_DIR" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_STANDARD=17 `
-            -DCMAKE_POLICY_DEFAULT_CMP0167=NEW `
-            -DCL_TARGET_OPENCL_VERSION=300 `
-            "-DCMAKE_CXX_FLAGS=/I`"$ws\compat`" /DCL_TARGET_OPENCL_VERSION=300 /DBOOST_TIMER_ENABLE_DEPRECATED=1 /D_CRT_SECURE_NO_WARNINGS"
+            -DCMAKE_CXX_FLAGS="/I$env:COMPAT_DIR /DBOOST_TIMER_ENABLE_DEPRECATED /DWIN32_LEAN_AND_MEAN /DNOMINMAX"
 
       - name: Build (Release)
+        run: cmake --build "%BUILD_DIR%" --config Release -- /m
+
+      - name: Collect artifacts
+        if: always()
         shell: pwsh
         run: |
-          cmake --build "$env:GITHUB_WORKSPACE/build-av" --config Release -m
+          New-Item -ItemType Directory -Force -Path "$env:BUILD_DIR\artifacts" | Out-Null
+          Get-ChildItem -Recurse "$env:BUILD_DIR" -Filter *.exe | Copy-Item -Destination "$env:BUILD_DIR\artifacts" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Recurse "$env:BUILD_DIR" -Filter *.dll | Copy-Item -Destination "$env:BUILD_DIR\artifacts" -Force -ErrorAction SilentlyContinue
 
-      - name: Upload EXEs
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Vina-GPU-windows-binaries
+          name: Vina-GPU-2.1_windows_x64_Release
           path: |
-            build-av/Release/*.exe
-            build-av/*.exe
-          if-no-files-found: warn
+            ${{ env.BUILD_DIR }}\artifacts
+            ${{ env.BUILD_DIR }}\AutoDock-Vina-GPU-2.1.dir\Release\*.pdb
